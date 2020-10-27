@@ -15,7 +15,7 @@ func Router(self RouterId, incoming <-chan interface{}, neighbours []chan<- inte
 					framework <- msg
 				} else {
 					// Handle forwarding on a message here
-					// msg.Hops += 1
+					msg.Hops += 1
 					for i, id := range neighbourIds {
 						//	fmt.Println(self)
 						//fmt.Println(i, id, table.Next[self])
@@ -30,15 +30,18 @@ func Router(self RouterId, incoming <-chan interface{}, neighbours []chan<- inte
 				if ReceivingEnd(self, msg.Dest) {
 					// fmt.Println(msg.rt)
 					// Update the routerTable
+					// var updateRec sync.WaitGroup
 					for id, Cost := range msg.Costs {
-						// if Cost+1-table.Costs[id] > 1 {
-						//	fmt.Println(table.Costs[id], Cost+1)
-						// }
+						// updateRec.Add(1)
+						// go func(ID int, sendCost uint) {
+						//	defer updateRec.Done()
 						if table.Costs[id] > Cost+1 {
 							table.Next[id] = msg.Sender
 							table.Costs[id] = Cost + 1
 						}
+						// }(id, Cost)
 					}
+					// updateRec.Wait()
 					msg.LockRef.Done()
 				} else {
 					// Handle forwarding on a message here
