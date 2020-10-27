@@ -1,7 +1,6 @@
 package routers
 
 import (
-	"fmt"
 	"sync"
 )
 
@@ -68,7 +67,7 @@ func InitializeRouters(t Template) []RouterTable {
 func MakeRouters(t Template) (in []chan<- interface{}, out <-chan Envelope) {
 	channels := make([]chan interface{}, len(t))
 	framework := make(chan Envelope)
-	distanceFrame := make(chan TableMsg)
+	// distanceFrame := make(chan TableMsg)
 
 	in = make([]chan<- interface{}, len(t))
 	for i := range channels {
@@ -77,22 +76,24 @@ func MakeRouters(t Template) (in []chan<- interface{}, out <-chan Envelope) {
 	}
 	out = framework
 	tableList := InitializeRouters(t)
-	fmt.Println(tableList[1])
+	// fmt.Println(tableList[1])
 
 	for routerId, neighbourIds := range t {
 		// Make outgoing channels for each neighbours
 		neighbours := make([]chan<- interface{}, len(neighbourIds))
 		for i, id := range neighbourIds {
 			neighbours[i] = channels[id]
+			//fmt.Println(i, id)
 		}
 		// Decide on where to pass the message
-		go Router(RouterId(routerId), channels[routerId], neighbours, framework, distanceFrame, &tableList[routerId])
+		go Router(RouterId(routerId), channels[routerId], neighbours, framework, neighbourIds, &tableList[routerId])
 	}
 
 	var wg sync.WaitGroup
 	for i := 0; i < 1000; i++ {
-		wg.Add(40)
 		for routerId, neighbourIds := range t {
+			wg.Add(len(neighbourIds))
+
 			//	Decide on where to pass the message
 			go func(ID RouterId, neighbours []RouterId) {
 				channels[ID] <- TableMsg{
@@ -115,7 +116,7 @@ func MakeRouters(t Template) (in []chan<- interface{}, out <-chan Envelope) {
 		}
 		wg.Wait()
 	}
-	fmt.Println(tableList[1])
+	// fmt.Println(tableList[0])
 
 	return
 }

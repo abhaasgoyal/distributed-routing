@@ -4,7 +4,7 @@ import (
 	"log"
 )
 
-func Router(self RouterId, incoming <-chan interface{}, neighbours []chan<- interface{}, framework chan<- Envelope, distanceFrame chan<- TableMsg, table *RouterTable) {
+func Router(self RouterId, incoming <-chan interface{}, neighbours []chan<- interface{}, framework chan<- Envelope, neighbourIds []RouterId, table *RouterTable) {
 	for {
 		select {
 		// The operation blocks here before the time limit I guess in the case of envelope
@@ -15,8 +15,15 @@ func Router(self RouterId, incoming <-chan interface{}, neighbours []chan<- inte
 					framework <- msg
 				} else {
 					// Handle forwarding on a message here
-					msg.Hops += 1
-					neighbours[0] <- msg
+					// msg.Hops += 1
+					for i, id := range neighbourIds {
+						//	fmt.Println(self)
+						//fmt.Println(i, id, table.Next[self])
+						if id == table.Next[msg.Dest] {
+							neighbours[i] <- msg
+						}
+					}
+					//	neighbours[0] <- msg
 				}
 			// Add more cases to handle any other message types you create here
 			case TableMsg:

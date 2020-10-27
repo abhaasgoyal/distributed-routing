@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	topology = flag.String("t", "Ring", "`topology` (by size: Line, Ring, Star, Fully_Connected; "+
+	topology = flag.String("t", "Mesh", "`topology` (by size: Line, Ring, Star, Fully_Connected; "+
 		"by dimension and size: Mesh, Torus; by dimension: Hypercube, Cube_Connected_Cycles, Butterfly, Wrap_Around_Butterfly)")
 	size      = flag.Uint("s", 20, "size")
 	dimension = flag.Uint("d", 2, "dimension")
@@ -20,7 +20,7 @@ var (
 	//printDistances   = flag.Bool("i", true, "print distances")
 	settleTime = flag.Duration("w", time.Second/10, "routers settle time")
 	//timeout          = flag.Duration("o", time.Second/10, "comms timeout")
-	mode     = flag.String("m", "One_To_All", "`mode` (One_To_All, All_To_One)")
+	mode     = flag.String("m", "All_To_One", "`mode` (One_To_All, All_To_One)")
 	dropouts = flag.Uint("x", 0, "dropouts")
 	repeats  = flag.Uint("r", 10, "repeats")
 	force    = flag.Bool("f", false, "force the creation of a large number of routers")
