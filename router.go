@@ -20,10 +20,18 @@ func Router(self RouterId, incoming <-chan interface{}, neighbours []chan<- inte
 				}
 			// Add more cases to handle any other message types you create here
 			case TableMsg:
-				if IdExists(self, msg.Dest) {
+				if ReceivingEnd(self, msg.Dest) {
 					// fmt.Println(msg.rt)
-					// Update the router
-					table = &msg.rt
+					// Update the routerTable
+					for id, Cost := range msg.Costs {
+						// if Cost+1-table.Costs[id] > 1 {
+						//	fmt.Println(table.Costs[id], Cost+1)
+						// }
+						if table.Costs[id] > Cost+1 {
+							table.Next[id] = msg.Sender
+							table.Costs[id] = Cost + 1
+						}
+					}
 					msg.LockRef.Done()
 				} else {
 					// Handle forwarding on a message here
@@ -41,7 +49,7 @@ func Router(self RouterId, incoming <-chan interface{}, neighbours []chan<- inte
 	}
 }
 
-func IdExists(item RouterId, DestIDs []RouterId) bool {
+func ReceivingEnd(item RouterId, DestIDs []RouterId) bool {
 	for i := 0; i < len(DestIDs); i++ {
 		if DestIDs[i] == item {
 			return true

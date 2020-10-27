@@ -19,14 +19,15 @@ type Envelope struct {
 type RouterTable struct {
 	// ID RouterId
 	//table     []Destination // Array indices will tell us the neighbouring ID
-	Next      []RouterId
-	totalCost []uint
+	Next  []RouterId
+	Costs []uint
 }
 
 type TableMsg struct {
 	LockRef *sync.WaitGroup
-	rt      RouterTable
+	Costs   []uint
 	Dest    []RouterId
+	Sender  RouterId
 }
 
 type TestMessage int
@@ -41,16 +42,18 @@ func InitializeRouters(t Template) []RouterTable {
 			// ith router is DistanceTable[j]
 			DistanceTable[j] = RouterTable{
 				// ID : j
-				Next:      make([]RouterId, len(t)),
-				totalCost: make([]uint, len(t)),
+				Next:  make([]RouterId, len(t)),
+				Costs: make([]uint, len(t)),
 			}
 			// fmt.Println(k)
-			for i := range DistanceTable[j].totalCost {
-				DistanceTable[j].totalCost[i] = 1000000
+			for i := range DistanceTable[j].Costs {
+				DistanceTable[j].Costs[i] = 1000000
+				//				DistanceTable[j].Next[i] = -1
 			}
+			DistanceTable[j].Costs[j] = 0
 			for _, neighbourId := range k {
 				// fmt.Println(neighbourId)
-				DistanceTable[j].totalCost[neighbourId] = 1
+				DistanceTable[j].Costs[neighbourId] = 1
 				DistanceTable[j].Next[neighbourId] = RouterId(neighbourId)
 			}
 			//		fmt.Println(DistanceTable[j])
@@ -88,17 +91,21 @@ func MakeRouters(t Template) (in []chan<- interface{}, out <-chan Envelope) {
 
 	var wg sync.WaitGroup
 	for i := 0; i < 1000; i++ {
+		wg.Add(40)
 		for routerId, neighbourIds := range t {
-			wg.Add(len(neighbourIds))
 			//	Decide on where to pass the message
 			go func(ID RouterId, neighbours []RouterId) {
 				channels[ID] <- TableMsg{
 					Dest:    neighbours,
 					LockRef: &wg,
-					rt: RouterTable{
-						totalCost: tableList[ID].totalCost,
-						Next:      tableList[ID].Next,
-					}}
+					Costs:   tableList[ID].Costs,
+					Sender:  ID,
+					// rt: RouterTable{
+					//	totalCost: tableList[ID].totalCost,
+					//	Next:      tableList[ID].Next,
+					// }
+				}
+				//				fmt.Println(ID)
 			}(RouterId(routerId), neighbourIds)
 
 			//	<-channels[ID]
@@ -108,6 +115,7 @@ func MakeRouters(t Template) (in []chan<- interface{}, out <-chan Envelope) {
 		}
 		wg.Wait()
 	}
+	fmt.Println(tableList[1])
 
 	return
 }
