@@ -16,18 +16,17 @@ type Envelope struct {
 	Message interface{}
 }
 
-type TableMessage struct {
-	operation string
-	table     RouterTable
-}
-
 type RouterTable struct {
 	// ID RouterId
-	table []Destination // Array indices will tell us the neighbouring ID
+	//table     []Destination // Array indices will tell us the neighbouring ID
+	Next      []RouterId
+	totalCost []uint
 }
-type Destination struct {
-	Next      RouterId
-	totalCost uint
+
+type TableMsg struct {
+	LockRef *sync.WaitGroup
+	rt      RouterTable
+	Dest    []RouterId
 }
 
 type TestMessage int
@@ -42,17 +41,17 @@ func InitializeRouters(t Template) []RouterTable {
 			// ith router is DistanceTable[j]
 			DistanceTable[j] = RouterTable{
 				// ID : j
-				table: make([]Destination, len(t)),
+				Next:      make([]RouterId, len(t)),
+				totalCost: make([]uint, len(t)),
 			}
 			// fmt.Println(k)
-			for i := range DistanceTable[j].table {
-				DistanceTable[j].table[i].totalCost = 1000000
-
+			for i := range DistanceTable[j].totalCost {
+				DistanceTable[j].totalCost[i] = 1000000
 			}
 			for _, neighbourId := range k {
 				// fmt.Println(neighbourId)
-				DistanceTable[j].table[neighbourId].totalCost = 1
-				DistanceTable[j].table[neighbourId].Next = RouterId(neighbourId)
+				DistanceTable[j].totalCost[neighbourId] = 1
+				DistanceTable[j].Next[neighbourId] = RouterId(neighbourId)
 			}
 			//		fmt.Println(DistanceTable[j])
 			wg.Done()
@@ -66,6 +65,7 @@ func InitializeRouters(t Template) []RouterTable {
 func MakeRouters(t Template) (in []chan<- interface{}, out <-chan Envelope) {
 	channels := make([]chan interface{}, len(t))
 	framework := make(chan Envelope)
+	distanceFrame := make(chan TableMsg)
 
 	in = make([]chan<- interface{}, len(t))
 	for i := range channels {
@@ -76,39 +76,37 @@ func MakeRouters(t Template) (in []chan<- interface{}, out <-chan Envelope) {
 	tableList := InitializeRouters(t)
 	fmt.Println(tableList[1])
 
-	var wg sync.WaitGroup
 	for routerId, neighbourIds := range t {
-		wg.Add(2)
 		// Make outgoing channels for each neighbours
 		neighbours := make([]chan<- interface{}, len(neighbourIds))
 		for i, id := range neighbourIds {
 			neighbours[i] = channels[id]
 		}
 		// Decide on where to pass the message
-		go Router(RouterId(routerId), channels[routerId], neighbours, framework, &tableList[routerId])
-		go func(ID int) {
-			channels[ID] <- RouterTable{
-				table: tableList[ID].table,
-			}
-			wg.Done()
-		}(routerId)
-		// go func(ID int) {
-		//	<-channels[ID]
-		//	fmt.Println("done")
-
-		//	wg.Done()
-		// }(routerId)
+		go Router(RouterId(routerId), channels[routerId], neighbours, framework, distanceFrame, &tableList[routerId])
 	}
-	wg.Wait()
 
-	for routerId, neighbourIds := range t {
-		// Make outgoing channels for each neighbours
-		neighbours := make([]chan<- interface{}, len(neighbourIds))
-		for i, id := range neighbourIds {
-			neighbours[i] = channels[id]
+	var wg sync.WaitGroup
+	for i := 0; i < 1000; i++ {
+		for routerId, neighbourIds := range t {
+			wg.Add(len(neighbourIds))
+			//	Decide on where to pass the message
+			go func(ID RouterId, neighbours []RouterId) {
+				channels[ID] <- TableMsg{
+					Dest:    neighbours,
+					LockRef: &wg,
+					rt: RouterTable{
+						totalCost: tableList[ID].totalCost,
+						Next:      tableList[ID].Next,
+					}}
+			}(RouterId(routerId), neighbourIds)
+
+			//	<-channels[ID]
+			//	fmt.Println("done")
+
+			//	wg.Done()
 		}
-		// Decide on where to pass the message
-		go Router(RouterId(routerId), channels[routerId], neighbours, framework, &tableList[routerId])
+		wg.Wait()
 	}
 
 	return
