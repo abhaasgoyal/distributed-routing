@@ -132,6 +132,7 @@ func main() {
 		envelope := <-out
 		if i, ok := envelope.Message.(uint); ok {
 			if _, ok := msgs[i]; ok {
+				//	fmt.Println(envelope.Message, envelope.Hops)
 				delete(msgs, i)
 				if len(msgs) == 0 {
 					break

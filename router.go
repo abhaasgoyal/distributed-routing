@@ -4,7 +4,7 @@ import (
 	"log"
 )
 
-func Router(self RouterId, incoming <-chan interface{}, neighbours []chan<- interface{}, framework chan<- Envelope, neighbourIds []RouterId, table *RouterTable) {
+func Router(self RouterId, incoming <-chan interface{}, neighbours []chan<- interface{}, framework chan<- Envelope, neighbourIds []RouterId, localTable *RouterTable) {
 	for {
 		select {
 		// The operation blocks here and repeatedly listens for calls
@@ -17,7 +17,7 @@ func Router(self RouterId, incoming <-chan interface{}, neighbours []chan<- inte
 					// Send the real world message to the routing table specs
 					msg.Hops += 1
 					for i, id := range neighbourIds {
-						if id == table.Next[msg.Dest] {
+						if id == localTable.Next[msg.Dest] {
 							neighbours[i] <- msg
 						}
 					}
@@ -27,9 +27,9 @@ func Router(self RouterId, incoming <-chan interface{}, neighbours []chan<- inte
 				if ReceivingEnd(self, msg.Dest) {
 					// Receive and Update the routerTable
 					for id, Cost := range msg.Costs {
-						if table.Costs[id] > Cost+1 {
-							table.Next[id] = msg.Sender
-							table.Costs[id] = Cost + 1
+						if Cost+1 < localTable.Costs[id] {
+							localTable.Next[id] = msg.Sender
+							localTable.Costs[id] = Cost + 1
 						}
 					}
 					msg.LockRef.Done()

@@ -15,8 +15,9 @@ type Envelope struct {
 	Message interface{}
 }
 
-// RouterTable of single router (identified by ID)
+// RouterTable of single router
 type RouterTable struct {
+	mu    sync.Mutex
 	Next  []RouterId
 	Costs []uint
 }
@@ -34,6 +35,7 @@ type TestMessage int
 func InitializeRoutingTable(t Template) []RouterTable {
 	// Here make the routing tables with lock step
 	DistanceTable := make([]RouterTable, len(t))
+	const infinity = 1000000
 	var routerGroup sync.WaitGroup
 	for routerId, neighbourIds := range t {
 		routerGroup.Add(1)
@@ -47,7 +49,7 @@ func InitializeRoutingTable(t Template) []RouterTable {
 				initialUpdateGroup.Add(1)
 				go func(CostIdx int) {
 					defer initialUpdateGroup.Done()
-					DistanceTable[self].Costs[CostIdx] = 1000000
+					DistanceTable[self].Costs[CostIdx] = infinity
 				}(i)
 			}
 			initialUpdateGroup.Wait()
@@ -58,7 +60,7 @@ func InitializeRoutingTable(t Template) []RouterTable {
 				go func(nIdx RouterId) {
 					defer initialUpdateGroup.Done()
 					DistanceTable[self].Costs[nIdx] = 1
-					DistanceTable[self].Next[nIdx] = RouterId(nIdx)
+					DistanceTable[self].Next[nIdx] = nIdx
 				}(neighbourId)
 			}
 			initialUpdateGroup.Wait()
@@ -70,18 +72,22 @@ func InitializeRoutingTable(t Template) []RouterTable {
 }
 
 func MakeRouters(t Template) (in []chan<- interface{}, out <-chan Envelope) {
+
+	// Array of channels
 	channels := make([]chan interface{}, len(t))
 	framework := make(chan Envelope)
 	// distanceFrame := make(chan TableMsg)
 
 	in = make([]chan<- interface{}, len(t))
 	for i := range channels {
+		// Synchronized channel for each router
 		channels[i] = make(chan interface{})
 		in[i] = channels[i]
 	}
 	out = framework
 
-	// tableList is the list for all tables
+	// tableList is the list for all routing tables
+	// Specific routing table reference will be sent
 	tableList := InitializeRoutingTable(t)
 
 	for routerId, neighbourIds := range t {
@@ -91,12 +97,20 @@ func MakeRouters(t Template) (in []chan<- interface{}, out <-chan Envelope) {
 			neighbours[i] = channels[id]
 		}
 		// Decide on where to pass the message
-		// We send two additional parameters - reference to the router's own table and the ID's of it's neighbours
+		// We send two additional parameters - reference to the router's own table and the ID's of it's neighbours (not the channel)
 		go Router(RouterId(routerId), channels[routerId], neighbours, framework, neighbourIds, &tableList[routerId])
 	}
 
 	var updateGroup sync.WaitGroup
+	// Update the DVR at least t times before running the main program (guaranteed to work)
 	for i := 0; i < len(t); i++ {
+		// Create a copy of the cost table for the iteration
+		// Because slices' values are passed by reference
+		costCopy := make([][]uint, len(t))
+		for i := range tableList {
+			costCopy[i] = make([]uint, len(t))
+			copy(costCopy[i], tableList[i].Costs)
+		}
 		for routerId, neighbourIds := range t {
 			updateGroup.Add(len(neighbourIds))
 			//	Decide on where to pass the message for routing tables
@@ -104,7 +118,7 @@ func MakeRouters(t Template) (in []chan<- interface{}, out <-chan Envelope) {
 				channels[ID] <- TableMsg{
 					Dest:    neighbours,
 					LockRef: &updateGroup,
-					Costs:   tableList[ID].Costs,
+					Costs:   costCopy[ID],
 					Sender:  ID,
 				}
 			}(RouterId(routerId), neighbourIds)
