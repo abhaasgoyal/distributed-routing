@@ -6,19 +6,20 @@ import (
 	"log"
 	"math/big"
 	"os"
+	"strings"
 	"time"
 
 	"routers"
 )
 
 var (
-	topology = flag.String("t", "Mesh", "`topology` (by size: Line, Ring, Star, Fully_Connected; "+
+	topology = flag.String("t", "Line", "`topology` (by size: Line, Ring, Star, Fully_Connected; "+
 		"by dimension and size: Mesh, Torus; by dimension: Hypercube, Cube_Connected_Cycles, Butterfly, Wrap_Around_Butterfly)")
-	size      = flag.Uint("s", 20, "size")
-	dimension = flag.Uint("d", 3, "dimension")
-	//printConnections = flag.Bool("c", true, "print connections")
-	//printDistances   = flag.Bool("i", true, "print distances")
-	settleTime = flag.Duration("w", time.Second/10, "routers settle time")
+	size             = flag.Uint("s", 20, "size")
+	dimension        = flag.Uint("d", 2, "dimension")
+	printConnections = flag.Bool("c", false, "print connections")
+	printDistances   = flag.Bool("i", false, "print distances")
+	settleTime       = flag.Duration("w", time.Second/10, "routers settle time")
 	//timeout          = flag.Duration("o", time.Second/10, "comms timeout")
 	mode     = flag.String("m", "One_To_All", "`mode` (One_To_All, All_To_One)")
 	dropouts = flag.Uint("x", 0, "dropouts")
@@ -36,6 +37,7 @@ func main() {
 	}
 
 	var template routers.Template
+
 	switch *topology {
 	case "Line", "Ring":
 		template = make(routers.Template, *size)
@@ -96,9 +98,20 @@ func main() {
 		flag.Usage()
 		os.Exit(1)
 	}
+	hops := make([][]uint, len(template))
+	for hopI := range hops {
+		hops[hopI] = make([]uint, len(template))
+	}
+
+	var maxHops uint = 0
+	var minHops = ^uint(0)
+	var totalMessages float64 = 0
+	var sumHops float64 = 0
 
 	in, out := routers.MakeRouters(template)
-
+	if *printConnections {
+		PrintConnections(template)
+	}
 	time.Sleep(*settleTime)
 	start := time.Now()
 
@@ -108,6 +121,7 @@ func main() {
 		msgs[uint(i)] = struct{}{}
 		go func(j routers.RouterId) {
 			switch *mode {
+			// Bug or feature of sending it to itself ? Handled in receiving tho
 			case "One_To_All":
 				in[0] <- routers.Envelope{
 					Dest:    j,
@@ -132,7 +146,17 @@ func main() {
 		envelope := <-out
 		if i, ok := envelope.Message.(uint); ok {
 			if _, ok := msgs[i]; ok {
-				//	fmt.Println(envelope.Message, envelope.Hops)
+				hops[envelope.Message.(uint)][envelope.Dest] = envelope.Hops
+				if envelope.Hops != 0 {
+					sumHops += float64(envelope.Hops)
+					totalMessages += 1.0
+					if envelope.Hops > maxHops {
+						maxHops = envelope.Hops
+					}
+					if envelope.Hops < minHops {
+						minHops = envelope.Hops
+					}
+				}
 				delete(msgs, i)
 				if len(msgs) == 0 {
 					break
@@ -144,7 +168,17 @@ func main() {
 			log.Printf("Unexpected message body %g! Make sure you aren't editing Envelopes.", envelope.Message)
 		}
 	}
+
+	fmt.Printf("\n------------------------------------------------------------------------------\n")
 	log.Printf("Test completed in %v\n", time.Since(start))
+
+	fmt.Printf("------------------------------ Measurements ------------------------------------\n")
+	fmt.Printf("Average Hops: %.2f \n", sumHops/totalMessages)
+	fmt.Printf("Minimum Hops: %d\n", minHops)
+	fmt.Printf("Maximum Hops: %d\n", maxHops)
+	if *printDistances {
+		PrintDistances(template, hops)
+	}
 }
 
 func exp(x uint, y uint) uint {
@@ -160,4 +194,77 @@ func exp(x uint, y uint) uint {
 		os.Exit(1)
 	}
 	return uint(z.Uint64())
+}
+
+// Below functions algorithm and design are inspired from the Ada version assignment
+func PrintConnections(t [][]routers.RouterId) {
+	fmt.Print("\n")
+	fmt.Println("--------------- Information about the selected network topology ----------------")
+
+	fmt.Print("\n")
+	fmt.Print("    ")
+	for i := range t {
+		fmt.Printf("%3d", i)
+	}
+	fmt.Print("\n")
+	fmt.Print("    +")
+	fmt.Print(strings.Repeat("---", len(t)))
+	fmt.Print("+\n")
+	for i := range t {
+		fmt.Printf("%3d", i)
+		fmt.Print(" |")
+		for j := range t {
+			if i == j {
+				fmt.Print(" . ")
+			} else if NodesConnected(routers.RouterId(j), t[i]) {
+				fmt.Print("<->")
+			} else {
+				fmt.Print("   ")
+			}
+		}
+		fmt.Print("|\n")
+	}
+	fmt.Print("    +")
+	fmt.Print(strings.Repeat("---", len(t)))
+	fmt.Print("+\n")
+
+}
+
+func PrintDistances(t [][]routers.RouterId, hops [][]uint) {
+	fmt.Print("\n")
+	fmt.Print("    ")
+	for i := range t {
+		fmt.Printf("%3d", i)
+	}
+	fmt.Print("\n")
+	fmt.Print("    +")
+	fmt.Print(strings.Repeat("---", len(t)))
+	fmt.Print("+\n")
+	for i := range t {
+		fmt.Printf("%3d", i)
+		fmt.Print(" |")
+		for j := range t {
+			if hops[i][j] != 0 {
+				fmt.Printf("%3d", hops[i][j])
+			} else if hops[j][i] != 0 {
+				fmt.Printf("%3d", hops[j][i])
+			} else {
+				fmt.Print("   ")
+			}
+		}
+		fmt.Print("|\n")
+	}
+	fmt.Print("    +")
+	fmt.Print(strings.Repeat("---", len(t)))
+	fmt.Print("+\n")
+
+}
+
+func NodesConnected(node routers.RouterId, t []routers.RouterId) bool {
+	for _, neighbour := range t {
+		if neighbour == node {
+			return true
+		}
+	}
+	return false
 }
