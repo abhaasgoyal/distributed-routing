@@ -27,23 +27,43 @@ func Router(self RouterId, incoming <-chan interface{}, neighbours []chan<- inte
 				if ReceivingEnd(self, msg.Dest) {
 					// Receive and Update the routerTable
 					// var routeGroup sync.WaitGroup
+					sameTable := true
 					for id, Cost := range msg.Costs {
-						// routeGroup.Add(1)
-						// go func(ID int, nCost uint) {
-						//	defer routeGroup.Done()
 						if Cost+1 < localTable.Costs[id] {
+							sameTable = false
 							localTable.Next[id] = msg.Sender
 							localTable.Costs[id] = Cost + 1
 						}
-						// }(id, Cost)
+					}
+
+					if !sameTable {
+						// var updateGroup sync.WaitGroup
+						costCopy := make([]uint, len(localTable.Costs))
+						copy(costCopy, localTable.Costs)
+						for i := range neighbours {
+							//	updateGroup.Add(1)
+							go func(j int) {
+								neighbours[j] <- TableMsg{
+									Dest:   neighbourIds,
+									Costs:  costCopy,
+									Sender: self,
+								}
+							}(i)
+						}
+						//	updateGroup.Wait()
+
 					}
 					// routeGroup.Wait()
-					msg.LockRef.Done()
 				} else {
 					// Handle forwarding of Routing Table
+					// var updateGroup sync.WaitGroup
 					for i := range neighbours {
 						go func(j int) {
-							neighbours[j] <- msg
+							neighbours[j] <- TableMsg{
+								Dest:   neighbourIds,
+								Costs:  msg.Costs,
+								Sender: self,
+							}
 						}(i)
 					}
 				}

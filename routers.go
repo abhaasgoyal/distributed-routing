@@ -17,17 +17,15 @@ type Envelope struct {
 
 // RouterTable of single router
 type RouterTable struct {
-	mu    sync.Mutex
 	Next  []RouterId
 	Costs []uint
 }
 
 // Messages to pass to implement DVR protocol
 type TableMsg struct {
-	LockRef *sync.WaitGroup
-	Costs   []uint
-	Dest    []RouterId
-	Sender  RouterId
+	Costs  []uint
+	Dest   []RouterId
+	Sender RouterId
 }
 
 type TestMessage int
@@ -101,29 +99,23 @@ func MakeRouters(t Template) (in []chan<- interface{}, out <-chan Envelope) {
 		go Router(RouterId(routerId), channels[routerId], neighbours, framework, neighbourIds, &tableList[routerId])
 	}
 
-	var updateGroup sync.WaitGroup
-	// Update the DVR at least t times before running the main program (guaranteed to work)
-	for i := 0; i < len(t); i++ {
-		// Create a copy of the cost table for the iteration
-		// Because slices' values are passed by reference
-		costCopy := make([][]uint, len(t))
-		for i := range tableList {
-			costCopy[i] = make([]uint, len(t))
-			copy(costCopy[i], tableList[i].Costs)
-		}
-		for routerId, neighbourIds := range t {
-			updateGroup.Add(len(neighbourIds))
-			//	Decide on where to pass the message for routing tables
-			go func(ID RouterId, neighbours []RouterId) {
-				channels[ID] <- TableMsg{
-					Dest:    neighbours,
-					LockRef: &updateGroup,
-					Costs:   costCopy[ID],
-					Sender:  ID,
-				}
-			}(RouterId(routerId), neighbourIds)
-		}
-		updateGroup.Wait()
+	// Create a copy of the cost table for the iteration
+	// Because slices' values are passed by reference
+	costCopy := make([][]uint, len(t))
+	for i := range tableList {
+		costCopy[i] = make([]uint, len(t))
+		copy(costCopy[i], tableList[i].Costs)
+	}
+
+	for routerId, neighbourIds := range t {
+		//	Decide on where to pass the message for routing tables
+		go func(ID RouterId, neighbours []RouterId) {
+			channels[ID] <- TableMsg{
+				Dest:   neighbours,
+				Costs:  costCopy[ID],
+				Sender: ID,
+			}
+		}(RouterId(routerId), neighbourIds)
 	}
 
 	return

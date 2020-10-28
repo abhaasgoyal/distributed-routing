@@ -15,7 +15,7 @@ import (
 var (
 	topology = flag.String("t", "Line", "`topology` (by size: Line, Ring, Star, Fully_Connected; "+
 		"by dimension and size: Mesh, Torus; by dimension: Hypercube, Cube_Connected_Cycles, Butterfly, Wrap_Around_Butterfly)")
-	size             = flag.Uint("s", 20, "size")
+	size             = flag.Uint("s", 5, "size")
 	dimension        = flag.Uint("d", 2, "dimension")
 	printConnections = flag.Bool("c", false, "print connections")
 	printDistances   = flag.Bool("i", false, "print distances")
