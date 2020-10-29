@@ -14,7 +14,8 @@ func Router(self RouterId, incoming <-chan interface{}, neighbours []chan<- inte
 				if msg.Dest == self {
 					framework <- msg
 				} else {
-					// Send the real world message to the routing table specs
+					// Send the real world message to the routing table
+					// specification
 					msg.Hops += 1
 					for i, id := range neighbourIds {
 						if id == localTable.Next[msg.Dest] {
@@ -22,11 +23,9 @@ func Router(self RouterId, incoming <-chan interface{}, neighbours []chan<- inte
 						}
 					}
 				}
-			// Add more cases to handle any other message types you create here
 			case TableMsg:
 				if ReceivingEnd(self, msg.Dest) {
 					// Receive and Update the routerTable
-					// var routeGroup sync.WaitGroup
 					sameTable := true
 					for id, Cost := range msg.Costs {
 						if Cost+1 < localTable.Costs[id] {
@@ -35,13 +34,11 @@ func Router(self RouterId, incoming <-chan interface{}, neighbours []chan<- inte
 							localTable.Costs[id] = Cost + 1
 						}
 					}
-
+					// Repeat until convergence
 					if !sameTable {
-						// var updateGroup sync.WaitGroup
 						costCopy := make([]uint, len(localTable.Costs))
 						copy(costCopy, localTable.Costs)
 						for i := range neighbours {
-							//	updateGroup.Add(1)
 							go func(j int) {
 								neighbours[j] <- TableMsg{
 									Dest:   neighbourIds,
@@ -50,13 +47,9 @@ func Router(self RouterId, incoming <-chan interface{}, neighbours []chan<- inte
 								}
 							}(i)
 						}
-						//	updateGroup.Wait()
-
 					}
-					// routeGroup.Wait()
 				} else {
 					// Handle forwarding of Routing Table
-					// var updateGroup sync.WaitGroup
 					for i := range neighbours {
 						go func(j int) {
 							neighbours[j] <- TableMsg{

@@ -18,7 +18,7 @@ go run  main.go -t Star -s 600 -d 3 -m All_To_One -x 0 -r 10
 
 # 2 dimension complex all to one
 go run  main.go -t Fully_Connected -s 20 -d 2 -m All_To_One -x 0 -r 10
-go run  main.go -t Mesh -s 10 -d 3 -m All_To_One -x 0 -r 10
+go run  main.go -t Mesh -s 5 -d 3 -m All_To_One -x 0 -r 10
 
 
 # 2 dimension basics  one to all

@@ -95,10 +95,19 @@ func MakeRouters(t Template) (in []chan<- interface{}, out <-chan Envelope) {
 			neighbours[i] = channels[id]
 		}
 		// Decide on where to pass the message
-		// We send two additional parameters - reference to the router's own table and the ID's of it's neighbours (not the channel)
+		// We send two additional parameters not provided in the original framework
+		// (1) Reference to the router's own table
+		// (2) ID of it's neighbours (not the channel)
+
 		go Router(RouterId(routerId), channels[routerId], neighbours, framework, neighbourIds, &tableList[routerId])
 	}
 
+	go updateDVR(channels, t, tableList)
+
+	return
+}
+
+func updateDVR(channels []chan interface{}, t Template, tableList []RouterTable) {
 	// Create a copy of the cost table for the iteration
 	// Because slices' values are passed by reference
 	costCopy := make([][]uint, len(t))
@@ -117,6 +126,4 @@ func MakeRouters(t Template) (in []chan<- interface{}, out <-chan Envelope) {
 			}
 		}(RouterId(routerId), neighbourIds)
 	}
-
-	return
 }
