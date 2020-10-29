@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+	"math/rand"
 	"os"
 	"strconv"
 	"strings"
@@ -24,7 +25,7 @@ var (
 	//timeout          = flag.Duration("o", time.Second/10, "comms timeout")
 	mode     = flag.String("m", "One_To_All", "`mode` (One_To_All, All_To_One)")
 	dropouts = flag.Uint("x", 0, "dropouts")
-	repeats  = flag.Uint("r", 10, "repeats")
+	repeats  = flag.Uint("r", 100, "repeats")
 	force    = flag.Bool("f", false, "force the creation of a large number of routers")
 )
 
@@ -139,55 +140,65 @@ func main() {
 
 	msgs := make(map[uint]struct{})
 
-	for i := routers.RouterId(0); int(i) < len(template); i++ {
-		msgs[uint(i)] = struct{}{}
-		go func(j routers.RouterId) {
-			switch *mode {
-			// Bug or feature of sending it to itself ? Handled in receiving tho
-			case "One_To_All":
-				in[0] <- routers.Envelope{
-					Dest:    j,
-					Hops:    0,
-					Message: uint(j),
+	source := rand.NewSource(time.Now().UnixNano())
+	seed := rand.New(source)
+	for test := 0; uint(test) < *repeats; test++ {
+		InitialNode := routers.RouterId(seed.Intn(len(template)))
+		for i := routers.RouterId(0); int(i) < len(template); i++ {
+			msgs[uint(i)] = struct{}{}
+			go func(j routers.RouterId) {
+				switch *mode {
+				// Bug or feature of sending it to itself ? Handled in receiving tho
+				case "One_To_All":
+					in[InitialNode] <- routers.Envelope{
+						Dest:    j,
+						Hops:    0,
+						Message: uint(j),
+					}
+				case "All_To_One":
+					in[j] <- routers.Envelope{
+						Dest:    InitialNode,
+						Hops:    0,
+						Message: uint(j),
+					}
+				default:
+					fmt.Fprintf(os.Stderr, "Unsupported test mode %s\n", *mode)
+					flag.Usage()
+					os.Exit(1)
 				}
-			case "All_To_One":
-				in[j] <- routers.Envelope{
-					Dest:    0,
-					Hops:    0,
-					Message: uint(j),
-				}
-			default:
-				fmt.Fprintf(os.Stderr, "Unsupported test mode %s\n", *mode)
-				flag.Usage()
-				os.Exit(1)
-			}
-		}(i)
-	}
+			}(i)
+		}
 
-	for {
-		envelope := <-out
-		if i, ok := envelope.Message.(uint); ok {
-			if _, ok := msgs[i]; ok {
-				hops[envelope.Message.(uint)][envelope.Dest] = envelope.Hops
-				if envelope.Hops != 0 {
-					sumHops += float64(envelope.Hops)
-					totalMessages += 1.0
-					if envelope.Hops > maxHops {
-						maxHops = envelope.Hops
+		for {
+			envelope := <-out
+			if i, ok := envelope.Message.(uint); ok {
+				if _, ok := msgs[i]; ok {
+					switch *mode {
+					case "All_To_One":
+						hops[envelope.Message.(uint)][envelope.Dest] = envelope.Hops
+					case "One_To_All":
+						hops[InitialNode][envelope.Dest] = envelope.Hops
 					}
-					if envelope.Hops < minHops {
-						minHops = envelope.Hops
+					if envelope.Hops != 0 {
+						sumHops += float64(envelope.Hops)
+						totalMessages += 1.0
+						if envelope.Hops > maxHops {
+							maxHops = envelope.Hops
+						}
+						if envelope.Hops < minHops {
+							minHops = envelope.Hops
+						}
 					}
-				}
-				delete(msgs, i)
-				if len(msgs) == 0 {
-					break
+					delete(msgs, i)
+					if len(msgs) == 0 {
+						break
+					}
+				} else {
+					log.Printf("Unexpected message value %v! Make sure you aren't duplicating Envelopes.", i)
 				}
 			} else {
-				log.Printf("Unexpected message value %v! Make sure you aren't duplicating Envelopes.", i)
+				log.Printf("Unexpected message body %g! Make sure you aren't editing Envelopes.", envelope.Message)
 			}
-		} else {
-			log.Printf("Unexpected message body %g! Make sure you aren't editing Envelopes.", envelope.Message)
 		}
 	}
 

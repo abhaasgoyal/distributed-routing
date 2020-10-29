@@ -34,7 +34,7 @@ func Router(self RouterId, incoming <-chan interface{}, neighbours []chan<- inte
 							localTable.Costs[id] = Cost + 1
 						}
 					}
-					// Repeat until convergence
+					// Repeat until convergence (setup time: diameter)
 					if !sameTable {
 						costCopy := make([]uint, len(localTable.Costs))
 						copy(costCopy, localTable.Costs)
