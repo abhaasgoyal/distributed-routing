@@ -6,6 +6,7 @@ import (
 	"log"
 	"math/big"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,7 +17,7 @@ var (
 	topology = flag.String("t", "Line", "`topology` (by size: Line, Ring, Star, Fully_Connected; "+
 		"by dimension and size: Mesh, Torus; by dimension: Hypercube, Cube_Connected_Cycles, Butterfly, Wrap_Around_Butterfly)")
 	size             = flag.Uint("s", 5, "size")
-	dimension        = flag.Uint("d", 2, "dimension")
+	dimension        = flag.Uint("d", 5, "dimension")
 	printConnections = flag.Bool("c", false, "print connections")
 	printDistances   = flag.Bool("i", false, "print distances")
 	settleTime       = flag.Duration("w", time.Second/10, "routers settle time")
@@ -91,6 +92,27 @@ func main() {
 			for n := range temp {
 				template[i][j] = n
 				j++
+			}
+		}
+	// Added hypercube for additional test
+	case "Hypercube":
+		template = make(routers.Template, 1<<*dimension)
+		for i := routers.RouterId(0); int(i) < len(template); i++ {
+			template[i] = make([]routers.RouterId, *dimension)
+			l := int(*dimension)
+			bin := fmt.Sprintf("%0*b", l, i)
+			for j := 0; j < l; j++ {
+				var temp string = bin
+				if temp[j] == '0' {
+					temp = temp[:j] + "1" + temp[j+1:]
+				} else {
+					temp = temp[:j] + "0" + temp[j+1:]
+				}
+				if num, err := strconv.ParseInt(temp, 2, 64); err != nil {
+					fmt.Println(err)
+				} else {
+					template[i][j] = routers.RouterId(num)
+				}
 			}
 		}
 	default:
@@ -267,4 +289,8 @@ func NodesConnected(node routers.RouterId, t []routers.RouterId) bool {
 		}
 	}
 	return false
+}
+
+func IsPowerOfTwo(x uint) bool {
+	return (x != 0) && ((x & (x - 1)) == 0)
 }

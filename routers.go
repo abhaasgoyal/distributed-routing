@@ -28,12 +28,13 @@ type TableMsg struct {
 	Sender RouterId
 }
 
+const infinity = 1000000
+
 type TestMessage int
 
 func InitializeRoutingTable(t Template) []RouterTable {
 	// Here make the routing tables with lock step
 	DistanceTable := make([]RouterTable, len(t))
-	const infinity = 1000000
 	var routerGroup sync.WaitGroup
 	for routerId, neighbourIds := range t {
 		routerGroup.Add(1)
