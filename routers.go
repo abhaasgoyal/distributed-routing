@@ -28,6 +28,17 @@ type TableMsg struct {
 	Sender RouterId
 }
 
+type SecretPass struct {
+	DeadGroup *sync.WaitGroup
+	Neighbour RouterId
+	Dest      RouterId
+	DeadID    RouterId
+	Cost      uint
+	Sender    RouterId
+}
+
+type Death struct{}
+
 const infinity = 1000000
 
 type TestMessage int
@@ -99,7 +110,6 @@ func MakeRouters(t Template) (in []chan<- interface{}, out <-chan Envelope) {
 		// We send two additional parameters not provided in the original framework
 		// (1) Reference to the router's own table
 		// (2) ID of it's neighbours (not the channel)
-
 		go Router(RouterId(routerId), channels[routerId], neighbours, framework, neighbourIds, &tableList[routerId])
 	}
 

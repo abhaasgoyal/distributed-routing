@@ -15,10 +15,11 @@ import (
 )
 
 var (
-	topology = flag.String("t", "Line", "`topology` (by size: Line, Ring, Star, Fully_Connected; "+
+	topology = flag.String("t", "Hypercube", "`topology` (by size: Line, Ring, Star, Fully_Connected; "+
 		"by dimension and size: Mesh, Torus; by dimension: Hypercube, Cube_Connected_Cycles, Butterfly, Wrap_Around_Butterfly)")
-	size             = flag.Uint("s", 5, "size")
-	dimension        = flag.Uint("d", 5, "dimension")
+	size      = flag.Uint("s", 20, "size")
+	dimension = flag.Uint("d", 5, "dimension")
+	// If set both of them as true won't work - Individually set them as true in the source
 	printConnections = flag.Bool("c", false, "print connections")
 	printDistances   = flag.Bool("i", false, "print distances")
 	settleTime       = flag.Duration("w", time.Second/10, "routers settle time")
@@ -142,7 +143,11 @@ func main() {
 
 	source := rand.NewSource(time.Now().UnixNano())
 	seed := rand.New(source)
+
+	// Sample Line for a node dying
+	// in[10] <- routers.Death{}
 	for test := 0; uint(test) < *repeats; test++ {
+		// InitialNode := routers.RouterId(0)
 		InitialNode := routers.RouterId(seed.Intn(len(template)))
 		for i := routers.RouterId(0); int(i) < len(template); i++ {
 			msgs[uint(i)] = struct{}{}
@@ -150,17 +155,21 @@ func main() {
 				switch *mode {
 				// Bug or feature of sending it to itself ? Handled in receiving tho
 				case "One_To_All":
+					// if j != 10 {
 					in[InitialNode] <- routers.Envelope{
 						Dest:    j,
 						Hops:    0,
 						Message: uint(j),
 					}
+					// }
 				case "All_To_One":
+					// if j != 10 {
 					in[j] <- routers.Envelope{
 						Dest:    InitialNode,
 						Hops:    0,
 						Message: uint(j),
 					}
+					// }
 				default:
 					fmt.Fprintf(os.Stderr, "Unsupported test mode %s\n", *mode)
 					flag.Usage()
@@ -199,6 +208,7 @@ func main() {
 			} else {
 				log.Printf("Unexpected message body %g! Make sure you aren't editing Envelopes.", envelope.Message)
 			}
+
 		}
 	}
 
@@ -206,6 +216,7 @@ func main() {
 	log.Printf("Test completed in %v\n", time.Since(start))
 
 	fmt.Printf("------------------------------ Measurements ------------------------------------\n")
+	fmt.Printf("Number of iterations: %d \n", *repeats)
 	fmt.Printf("Average Hops: %.2f \n", sumHops/totalMessages)
 	fmt.Printf("Minimum Hops: %d\n", minHops)
 	fmt.Printf("Maximum Hops: %d\n", maxHops)
@@ -229,7 +240,7 @@ func exp(x uint, y uint) uint {
 	return uint(z.Uint64())
 }
 
-// Below functions algorithm and design are inspired from the Ada version assignment
+// Below 3 functions' algorithm and design are inspired from the Ada version assignment
 func PrintConnections(t [][]routers.RouterId) {
 	fmt.Print("\n")
 	fmt.Println("--------------- Information about the selected network topology ----------------")
