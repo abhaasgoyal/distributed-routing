@@ -4,7 +4,14 @@ The project consists of a distributed system of various topologies of routers wh
 
 # Usage
 
-```go run cmd/test_routers/main.go -t [Topology] -s [Size] -d [Dimensions] -c [Print Connections switch] -i [Print Distances switch] -w [Settling time] -m [Source/Destination Configuration] -x [Simulate Dropouts] -r [Number of repetitions]```
+```
+go run cmd/test_routers/main.go -t [Topology] -s [Size] -d [Dimensions]
+                                -c [Print Connections switch]
+                                -i [Print Distances switch] -w [Settling time]
+                                -m [Source/Destination Configuration]
+                                -x [Simulate Dropouts]
+                                -r [Number of repetitions]
+```
 
 1. `Supported Topologies` -
    * By size: Line, Ring, Star, Fully_Connected
