@@ -25,4 +25,4 @@ go run cmd/test_routers/main.go -t [Topology] -s [Size] -d [Dimensions]
 
 # Message structure
 
-Various types of messages and their structures are decided before the routers are deployed and is encapsulated in [a relative link](Diagram.pdf)
+Various types of messages and their structures are decided before the routers are deployed and is encapsulated in [a diagram](Diagram.pdf)
